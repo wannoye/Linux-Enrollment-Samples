@@ -1,0 +1,56 @@
+---
+- name: Qualys Installation
+  hosts: all
+  gather_facts: true
+  become: true
+  vars:
+  - ansible_connection: paramiko_ssh
+
+  tasks:
+
+  - name: Copy Qualys Agent DEB to Target System (Ubuntu)
+    when: ansible_facts['os_family'] == "Debian"
+    copy:
+      src: ./qualys-cloud-agent.x86_64.deb
+      dest: /tmp/qualys-cloud-agent.x86_64.deb
+      mode: 0755
+
+  - name: Copy Qualys Agent RPM to Target System (RHEL, Suse, Alma)
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "Suse" or
+          ansible_facts['os_family'] == "AlmaLinux"
+    copy:
+      src: ./qualys-cloud-agent.x86_64.rpm
+      dest: /tmp/qualys-cloud-agent.x86_64.rpm
+      mode: 0755
+
+  - name: Install Qualys Agent DEB (Ubuntu)
+    when: ansible_facts['os_family'] == "Debian"
+    apt:
+      deb: /tmp/qualys-cloud-agent.x86_64.deb
+      state: present
+    notify:
+    - register agent
+
+  - name: Install Qualys Agent RPM (RHEL, Alma)
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "AlmaLinux"
+    yum:
+      name: /tmp/qualys-cloud-agent.x86_64.rpm
+      state: present
+      disable_gpg_check: true
+    notify:
+    - register agent
+
+  - name: Install Qualys Agent RPM (SUSE)
+    when: (ansible_facts['os_family'] == "Suse")
+    zypper:
+      name: /tmp/qualys-cloud-agent.x86_64.rpm
+      state: present
+      disable_gpg_check: true
+    notify:
+    - register agent
+
+  handlers:
+    - name: register agent
+      shell: "/usr/local/qualys/cloud-agent/bin/qualys-cloud-agent.sh ActivationId={{ act_id }} CustomerId={{ cust_id }}"

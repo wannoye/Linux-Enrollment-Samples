@@ -1,0 +1,56 @@
+#!/bin/bash
+qa_file=qa/{{ inventory_hostname | lower }}
+
+printf "\n\n\n\n\n--------------------------------------------------" >> $qa_file
+printf "\nLocal Bastion QA Info for {{ inventory_hostname | upper }}" >> $qa_file
+printf "\n--------------------------------------------------\n" >> $qa_file
+
+printf "\n------------------ ACCESS SCRIPT ------------------\n\n" >> $qa_file
+
+access=/opt/access/{{ cust_code | lower }}/{{ inventory_hostname | lower }}
+
+if [ -s "$access" ]; then
+    while read line; do
+        echo "$line" >> $qa_file
+    done < $access
+else
+    printf "Error: Access script at $access is empty or does not exist." >> $qa_file
+fi
+
+printf "\n------------------ HOSTS FILE ------------------\n" >> $qa_file
+
+host=$(grep {{ inventory_hostname | lower }} /etc/hosts)
+fmcheck=$(echo $host | wc -w)
+
+if (($fmcheck >= 2 && $fmcheck <= 3)); then 
+	printf "\n$host\n" >> $qa_file
+elif [ -z "$host" ]; then
+    printf "\nError: An '/etc/hosts' file entry does not exist for {{ inventory_hostname | upper }}\n." >> $qa_file
+else 
+    printf "\nError: The '/etc/hosts' file entry for {{ inventory_hostname | upper }} is incorrect:\n" >> $qa_file
+    printf "\n$host\n" >> $qa_file
+fi
+
+printf "\n------------------ SYSLOG RELAY ------------------\n\n" >> $qa_file
+
+logfile=/var/log/syslog
+logs=$(awk -v v='{{ inventory_hostname | lower  }}' '$7 ~ v' $logfile | head -3)
+if [ ! -z "$logs" ]; then
+    printf "$logs" >> $qa_file
+else 
+    printf "Logs from {{ inventory_hostname | upper }} are not reaching the local bastion." >> $qa_file
+fi
+
+printf "\n\n------------------ SNMPWalk ------------------\n\n" >> $qa_file
+
+ip=$(grep -ie '\s{{ inventory_hostname | lower }}.' /etc/hosts | awk '{print $1}')
+ipcheck=$(echo $ip | wc -w)
+
+if (($ipcheck == 1)); then
+    snmpwalk -v3 -u '{{ snmp_user }}' -l authPriv -a MD5 -A '{{ snmp_string }}' -x DES -X '{{ snmp_string }}' $ip system | head -10 >> $qa_file 2>&1
+else
+    printf "\nError: The IP address collected for {{ inventory_hostname | upper }} is incorrect. There is likely a duplicate entry or problem in the '/etc/hosts' file.\n" >> $qa_file
+    printf "\nIP Address Collected: $ip\n" >> $qa_file
+fi
+
+exit 0

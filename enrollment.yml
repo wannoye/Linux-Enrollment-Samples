@@ -1,0 +1,211 @@
+---
+- name: Enroll RHEL Suse & Ubuntu Devices
+  hosts: all
+  gather_facts: true
+  become: true
+  vars:
+  - ansible_connection: paramiko_ssh
+
+  tasks:
+
+  - name: Install net-snmp (RHEL, Suse, Alma)
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "Suse" or
+          ansible_facts['os_family'] == "AlmaLinux"
+    package:
+      name: net-snmp
+      state: present
+
+  - name: Install snmpd (Ubuntu)
+    when: ansible_facts['os_family'] == "Debian"
+    package:
+      name: snmpd
+      state: present
+
+  - name: Make a backup copy of snmpd.conf
+    shell: "cp /etc/snmp/snmpd.conf /etc/snmp/snmpd.conf.backup"
+
+  - name: Copy snmpd.conf file into place
+    copy:
+      src: ./snmpd.conf
+      dest: /etc/snmp/snmpd.conf
+      owner: root
+      group: root
+      mode: '0600'
+    notify:
+    - restart SNMPd
+
+  - name: Install Python2 (RHEL, Ubuntu, Alma)
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "Debian" or
+          ansible_facts['os_family'] == "AlmaLinux"
+    package:
+      name: python2
+      state: present
+
+  - name: Copy snmp-get-local-data.py file into place (RHEL, Ubuntu, Alma)
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "Debian" or
+          ansible_facts['os_family'] == "AlmaLinux"
+    copy:
+      src: ./snmp-get-local-data.py
+      dest: /usr/local/bin/snmp-get-local-data.py
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Copy snmp-get-local-data.py file into place (Suse)
+    when: ansible_facts['os_family'] == "Suse"
+    copy:
+      src: ./python3_snmp-get-local-data.py
+      dest: /usr/local/bin/snmp-get-local-data.py
+      owner: root
+      group: root
+      mode: '0755'
+
+  - name: Start SNMPd service
+    service:
+      name: "snmpd"
+      state: started
+
+  - name: Stop SNMPd service
+    service:
+      name: "snmpd"
+      state: stopped
+
+  - name: Configure SNMP account (RHEL, Suse, Alma)
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "Suse" or
+          ansible_facts['os_family'] == "AlmaLinux"
+    lineinfile:
+      path: /var/lib/net-snmp/snmpd.conf
+      line: createUser "{{ snmp_user }}" MD5 "{{ snmp_string }}" DES
+      insertafter: EOF
+
+  - name: Configure SNMP account (Ubuntu)
+    when: ansible_facts['os_family'] == "Debian"
+    lineinfile:
+      path: /var/lib/snmp/snmpd.conf
+      line: createUser "{{ snmp_user }}" MD5 "{{ snmp_string }}" DES
+      insertafter: EOF
+
+  - name: Start SNMPd service
+    service:
+      name: "snmpd"
+      state: started
+      enabled: yes
+
+  - name: Create the access group (Internal)
+    when: internal | bool
+    group:
+      name: "{{ access_group }}"
+      state: present
+
+  - name: Add the 'ansible_user' account to the access group (Internal)
+    when: internal | bool
+    user:
+      name: "{{ ansible_user }}"
+      groups: "{{ access_group }}"
+      append: yes
+
+  - name: Allow members of the access group to ssh (Internal)
+    when:
+      - internal | bool
+      - ansible_facts['os_family'] != "Suse"
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      line: AllowGroups "{{ access_group }}" root
+      insertafter: EOF
+
+  - name: Copy the syslog config file syslog_destinations.conf into place
+    template:
+      src: ./syslog_destinations.conf.j2
+      dest: /etc/rsyslog.d/syslog_destinations.conf
+      owner: root
+      group: root
+      mode: '0600'
+    notify:
+    - restart rsyslog
+
+  - name: Fix settings in /etc/logrotate.conf
+    lineinfile:
+      path: /etc/logrotate.conf
+      regexp: 'dateext'
+      line: '# dateext'
+    ignore_errors: yes
+
+  - name: Copy syslog logrotate configuration into place (Internal - RHEL, Alma)
+    when:
+      - internal | bool
+      - ansible_facts['os_family'] == "RedHat" or ansible_facts['os_family'] == "AlmaLinux"
+    copy:
+      src: ./rhel_internal_syslog
+      dest: /etc/logrotate.d/syslog
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: Copy syslog logrotate configuration into place (Internal - Suse)
+    when:
+      - ansible_facts['os_family'] == "Suse"
+      - internal | bool
+    copy:
+      src: ./suse_internal_syslog
+      dest: /etc/logrotate.d/syslog
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: Copy rsyslog logrotate configuration into place (Internal - Ubuntu)
+    when:
+      - ansible_facts['os_family'] == "Debian"
+      - internal | bool
+    copy:
+      src: ./ubuntu_internal_rsyslog
+      dest: /etc/logrotate.d/rsyslog
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: Copy syslog logrotate configuration into place (Customer - RHEL, Alma)
+    when:
+      - not internal | bool
+      - ansible_facts['os_family'] == "RedHat" or ansible_facts['os_family'] == "AlmaLinux"
+    copy:
+      src: ./rhel_syslog
+      dest: /etc/logrotate.d/syslog
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: Copy syslog logrotate configuration into place (Customer - Suse)
+    when:
+      - ansible_facts['os_family'] == "Suse"
+      - not internal | bool
+    copy:
+      src: ./suse_syslog
+      dest: /etc/logrotate.d/syslog
+      owner: root
+      group: root
+      mode: '0644'
+
+  - name: Copy rsyslog logrotate configuration into place (Customer - Ubuntu)
+    when:
+      - ansible_facts['os_family'] == "Debian"
+      - not internal | bool
+    copy:
+      src: ./ubuntu_rsyslog
+      dest: /etc/logrotate.d/rsyslog
+      owner: root
+      group: root
+      mode: '0644'
+
+  handlers:
+    - name: restart SNMPd
+      service:
+        name: "snmpd"
+        state: restarted
+    - name: restart rsyslog
+      service:
+        name: "rsyslog"
+        state: restarted

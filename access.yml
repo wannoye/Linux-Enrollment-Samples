@@ -1,0 +1,31 @@
+---
+- name: Access Script Setup
+  hosts: localhost
+  gather_facts: false
+  vars:
+  - ansible_connection: local
+
+  tasks:
+
+    - name: Create Customer Folder
+      become: false
+      file:
+        path: "/opt/access/{{ cust_code | lower }}"
+        state: directory
+        mode: '0770'
+
+- name: Create Access Scripts
+  hosts: all
+  gather_facts: false
+
+  tasks:
+
+    - name: Create Access Scripts
+      delegate_to: localhost
+      become: false
+      template:
+        src: access.j2
+        dest: "/opt/access/{{ cust_code | lower }}/{{ inventory_hostname | lower }}"
+        owner: root
+        group: "{{ access_group }}"
+        mode: '0770'

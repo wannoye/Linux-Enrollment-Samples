@@ -1,0 +1,89 @@
+---
+- name: Setup Accounts
+  hosts: all
+  become: yes
+  gather_facts: true
+
+  tasks:
+
+  - name: Create a User (Ubuntu)
+    when: ansible_facts['os_family'] == "Debian"
+    user:
+      name: "{{ new_user }}"
+      shell: /bin/bash
+      password: "{{ new_user_hash }}"
+      createhome: yes
+      groups: sudo
+      append: yes
+      state: present
+
+  - name: Create a User (RHEL, Suse, Alma)
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "Suse" or
+          ansible_facts['os_family'] == "AlmaLinux"
+    user:
+      name: "{{ new_user }}"
+      shell: /bin/bash
+      password: "{{ new_user_hash }}"
+      createhome: yes
+      groups: wheel
+      append: yes
+      state: present
+
+  - name: Change 'ansible_user' Account Password (Ubuntu)
+    when: 
+      - ansible_facts['os_family'] == "Debian"
+      - '"ansible" in user_list'
+    user:
+      name: "{{ ansible_user }}"
+      update_password: always
+      password: "{{ new_ansible_hash }}"
+    vars:
+      user_list: "{{ getent_passwd.keys()|list }}"
+
+  - name: Change 'ansible_user' Account Password (RHEL, Suse, Alma)
+    when:
+      - '"{{ ansible_user }}" in user_list' 
+      - ansible_facts['os_family'] == "RedHat" or ansible_facts['os_family'] == "Suse" or ansible_facts['os_family'] == "AlmaLinux"
+    user:
+      name: "{{ ansible_user }}"
+      update_password: always
+      password: "{{ new_ansible_hash }}"
+    vars:
+      user_list: "{{ getent_passwd.keys()|list }}"
+
+  - name: Create the Access Group (If Internal)
+    when: internal | bool
+    group:
+      name: "{{ access_group }}"
+      state: present
+
+  - name: Add the New Account to Access Group (If Internal)
+    user:
+      name: "{{ new_user }}"
+      groups: "{{ access_group }}"
+      append: yes
+    when:
+      - internal | bool
+
+  - name: Add 'ansible_user' Account to Access Group (If Internal)
+    user:
+      name: "{{ ansible_user }}"
+      groups: "{{ access_group }}"
+      append: yes
+    vars:
+      user_list: "{{ getent_passwd.keys()|list }}"
+    when:
+      - internal | bool
+      - '"{{ ansible_user }}" in user_list'
+
+  - name: Allow members of the Access Group to ssh (If Internal)
+    when:
+      - internal | bool
+      - ansible_facts['os_family'] != "Suse"
+    lineinfile:
+      path: /etc/ssh/sshd_config
+      line: AllowGroups "{{ access_group }}" root
+      insertafter: EOF
+    vars:
+      ansible_sudo_pass: "{{ new_ansible_pass }}"

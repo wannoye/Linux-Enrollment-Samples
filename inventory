@@ -1,0 +1,3 @@
+<HOSTNAME> ansible_ssh_user=<USER> ansible_ssh_pass=<PASSWORD> ansible_become_pass=<BECOME_PASS>
+<HOSTNAME>
+<HOSTNAME>

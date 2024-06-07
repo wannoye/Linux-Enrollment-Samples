@@ -1,0 +1,16 @@
+#!/bin/bash
+SCANNED_DIR=/
+
+d=$(date)
+biweek=$((($(date -d "$d" +%-U) % 2) * 168))
+hourofweekstartingday=$((($(date -d "$d" +%-u) % 7) * 24))
+hourofday=$(date -d "$d" +%-H)
+biweekly_hour=$(( $biweek + $hourofweekstartingday + $hourofday))
+
+hostname_md5sum=$(hostname| md5sum)
+hostname_md5sum_part=${hostname_md5sum:0:4}
+hostname_hour=$(( 16#$hostname_md5sum_part % (24 * 7 * 2) ))
+
+if [ $biweekly_hour -eq $hostname_hour ]; then
+  clamscan $SCANNED_DIR
+fi

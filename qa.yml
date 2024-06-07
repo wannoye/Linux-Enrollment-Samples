@@ -1,0 +1,75 @@
+---
+- name: Linux QA Setup
+  hosts: localhost
+  gather_facts: false
+  vars:
+  - ansible_connection: local
+
+  tasks:
+
+    - name: Create QA folder
+      file:
+        path: qa
+        state: directory
+        mode: 0777
+
+- name: QA Linux Devices
+  hosts: all
+  gather_facts: true
+  become: true
+  vars:
+  - ansible_connection: paramiko_ssh
+
+  tasks:
+
+  - name: Copy the qa_remote.sh script into place
+    template:
+      src: qa_remote.sh.j2
+      dest: /tmp/qa_remote.sh
+      owner: root
+      group: root
+      mode: 0700
+
+  - name: Run the qa_remote.sh script
+    shell: sh /tmp/qa_remote.sh
+    ignore_errors: true
+
+  - name: Fetch QA File to BMN
+    fetch:
+      src: "/tmp/{{ inventory_hostname | lower }}"
+      dest: qa/
+      flat: yes
+      mode: 0666
+
+  - name: Clean up remote files
+    file:
+      state: absent
+      path: "{{ item }}"
+    with_items:
+      - /tmp/qa_remote.sh
+      - "/tmp/{{ inventory_hostname | lower }}"
+
+- name: Local QA
+  hosts: all
+  gather_facts: false
+  vars:
+  - ansible_connection: local
+
+  tasks:
+
+  - name: Copy the qa_local.sh script into place
+    template:
+      src: qa_local.sh.j2
+      dest: "qa_local_{{ inventory_hostname | lower }}.sh"
+      owner: root
+      group: root
+      mode: 0700
+
+  - name: Run the qa_local.sh script
+    shell: "sh qa_local_{{ inventory_hostname | lower }}.sh"
+    ignore_errors: true
+
+  - name: Clean up qa_local.sh file
+    file:
+      state: absent
+      path: "qa_local_{{ inventory_hostname | lower }}.sh"

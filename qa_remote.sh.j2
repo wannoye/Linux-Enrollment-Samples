@@ -1,0 +1,60 @@
+#!/bin/bash
+name={{ inventory_hostname | lower }}
+qa_file=/tmp/$name
+touch $qa_file
+
+printf "\n--------------------------------------------------" > $qa_file
+printf "\nEnrollment QA info for {{ inventory_hostname | upper }}" >> $qa_file
+printf "\n--------------------------------------------------\n" >> $qa_file
+
+printf "\n------------------ REMOTE ALL.LOG ------------------\n\n" >> $qa_file
+
+logfile=/var/log/syslog
+
+if [ -s "$logfile" ]; then
+    logs=$(head -5 $logfile)
+    printf "$logs" >> $qa_file
+else
+    printf "Error: File $logfile does not exist or is empty." >> $qa_file
+fi
+
+printf "\n\n------------------ REMOTE SYSLOG ROTATION ------------------\n\n" >> $qa_file
+
+archive_dir=/var/log/archive
+
+last_months_archive () {
+    lm_folder="$archive_dir/$(date +%Y)/$(date -d -1month +%m)"
+    if [ -d "$lm_folder" ]; then
+        lm_files=$(ls -laht "$lm_folder" | head -10)
+        printf "$lm_files" >> $qa_file
+    else
+        printf "Error: Directory $lm_folder does not exists." >> $qa_file
+    fi
+}
+
+this_months_archive () {
+    tm_folder="$archive_dir/$(date +%Y)/$(date +%m)"
+    if [ -d "$tm_folder" ]; then
+        tm_files=$(ls -laht "$tm_folder" | head -10)
+        printf "$tm_files" >> $qa_file
+    else
+        printf "Error: Directory $tm_folder does not exists." >> $qa_file
+    fi
+}
+
+day=$(date +%d)
+
+if [ "$day" -eq 01 ]; then
+    printf "Day of the month is: $day, Showing files from last month:\n\n" >> $qa_file
+    last_months_archive
+elif [ "$day" -eq 02 ]; then
+    printf "Day of the month is: $day, Showing files from both this month and last:\n\n" >> $qa_file
+    this_months_archive
+    printf "\n\n" >> $qa_file
+    last_months_archive
+else
+    printf "Day of the month is: $day, Showing files from this month:\n\n" >> $qa_file
+    this_months_archive
+fi
+
+exit 0

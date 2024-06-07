@@ -1,0 +1,71 @@
+---
+- name: Audit Setup
+  hosts: localhost
+  gather_facts: false
+  vars:
+  - ansible_connection: local
+
+  tasks:
+
+    - name: Create audit folder
+      become: false
+      file:
+        path: audit
+        state: directory
+        mode: 0777
+
+- name: Audit Linux Devices
+  hosts: all
+  gather_facts: true
+  become: true
+  vars:
+  - ansible_connection: paramiko_ssh
+
+  tasks:
+
+  - name: Copy the audit_rhel.sh script into place
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "AlmaLinux"
+    template:
+      src: audit_rhel.sh.j2
+      dest: /tmp/audit.sh
+      owner: root
+      group: root
+      mode: 0700
+
+  - name: Copy the audit_ubuntu.sh script into place
+    when: ansible_facts['os_family'] == "Debian"
+    template:
+      src: audit_ubuntu.sh.j2
+      dest: /tmp/audit.sh
+      owner: root
+      group: root
+      mode: 0700
+
+  - name: Copy the audit_suse.sh script into place
+    when: ansible_facts['os_family'] == "Suse"
+    template:
+      src: audit_suse.sh.j2
+      dest: /tmp/audit.sh
+      owner: root
+      group: root
+      mode: 0700
+
+  - name: Run the audit.sh script
+    shell: sh /tmp/audit.sh
+    ignore_errors: true
+
+  - name: Fetch Audit File to BMN
+    fetch:
+      src: "/tmp/{{ inventory_hostname | lower }}"
+      dest: audit/
+      flat: yes
+      mode: 0666
+
+  - name: Clean up remote files
+    file:
+      state: absent
+      path: "{{ item }}"
+    with_items:
+      - /tmp/audit.sh
+      - "/tmp/{{ inventory_hostname | lower }}"

@@ -1,0 +1,40 @@
+#!/bin/bash
+name={{ inventory_hostname | lower }}
+audit_file=/tmp/$name
+touch $audit_file
+
+echo "Enrollment Audit Info for {{ inventory_hostname | upper }}" > $audit_file
+
+printf "\n------------------ HOSTNAME ------------------\n\n" >> $audit_file
+hostname &>> $audit_file
+
+printf "\n------------------ DATE ------------------\n\n" >> $audit_file
+date &>> $audit_file
+
+printf "\n------------------ IP ADDRESS ------------------\n\n" >> $audit_file
+ip addr &>> $audit_file
+
+printf "\n------------------ OS RELEASE ------------------\n\n" >> $audit_file
+cat /etc/*-release* &>> $audit_file
+
+printf "\n------------------ FILESYSTEMS ------------------\n\n" >> $audit_file
+df -h  &>> $audit_file
+
+printf "\n------------------ CPU & MEMORY INFO ------------------\n\n" >> $audit_file
+vmstat  &>> $audit_file
+
+printf "\n------------------ PYTHON VERSION ------------------\n\n" >> $audit_file
+python -V &>> $audit_file
+printf "\n---\n\n"
+rpm -qa | grep -i python &>> $audit_file
+
+printf "\n------------------ FIREWALL STATUS ------------------\n\n" >> $audit_file
+systemctl status firewalld &>> $audit_file
+
+printf "\n------------------ FIREWALL RULES ------------------\n\n" >> $audit_file
+firewall-cmd --list-all &>> $audit_file
+
+printf "\n------------------- AVAILABLE PATCHES -----------------\n\n" >> $audit_file
+yum check-update &>> $audit_file
+
+exit 0

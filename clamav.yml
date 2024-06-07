@@ -1,0 +1,198 @@
+---
+- name: ClamAV Installation
+  hosts: all
+  gather_facts: true
+  become: true
+  vars:
+  - ansible_connection: paramiko_ssh
+
+  tasks:
+
+  - name: Check Repo Access
+    ansible.builtin.uri:
+      url: "{{ clamav_repo }}"
+      method: GET
+      timeout: 3
+    register: repo
+    failed_when: repo.status != 200
+    when: not proxy | bool
+  - debug: var=repo.status
+
+  - name: Check Repo Access Using a Proxy
+    ansible.builtin.uri:
+      url: "{{ clamav_repo }}"
+      method: GET
+      timeout: 3
+    register: proxy_repo
+    environment:
+      http_proxy: "http://{{ tunnel_ip }}:{{ proxy_port }}"
+    failed_when: proxy_repo.status != 200
+    when: proxy | bool
+  - debug: var=proxy_repo.status
+
+  - name: Install ClamAV (Ubuntu)
+    apt:
+      name:
+        - clamav
+        - clamav-daemon
+        - apparmor-utils
+      state: present
+    when: ansible_facts['os_family'] == "Debian"
+
+  - name: Install ClamAV (RHEL, Alma)
+    yum:
+      name:
+        - clamd
+        - clamav-update
+        - clamav-filesystem
+        - clamav
+        - clamav-lib
+      state: present
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "AlmaLinux"
+
+  - name: Configure SELinux (RHEL, Alma)
+    shell: |
+      setsebool -P antivirus_can_scan_system 1
+      setsebool -P clamd_use_jit 1
+    ignore_errors: yes
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "AlmaLinux"
+
+  - name: Configure AppArmor (Ubuntu)
+    shell: aa-complain /usr/sbin/clamd
+    ignore_errors: yes
+    when: ansible_facts['os_family'] == "Debian"
+
+  - name: Comment the Example & Set LocalSocket and User in scan.conf (RHEL, Alma)
+    lineinfile:
+      path: /etc/clamd.d/scan.conf
+      regexp: '{{ item.regexp }}'
+      line: '{{ item.line }}'
+    loop:
+      - line: '#Example'
+        regexp: '^Example'
+      - line: 'LocalSocket /run/clamd.scan/clamd.sock'
+        regexp: '^#LocalSocket /run/clamd.scan/clamd.sock'
+      - line: 'User root'
+        regexp: '^User'
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "AlmaLinux"
+
+  - name: Configure User in clamd.conf (Ubuntu)
+    lineinfile:
+      path: /etc/clamav/clamd.conf
+      regexp: '^User'
+      line: 'User root'
+    when: ansible_facts['os_family'] == "Debian"
+
+  - name: Add Exclusions in scan.conf (RHEL, Alma)
+    blockinfile:
+      path: /etc/clamd.d/scan.conf
+      insertafter: "#ExcludePath ^/sys/"
+      block: |
+        ExcludePath /data/
+        ExcludePath /dev/
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "AlmaLinux"
+
+  - name: Stop the clamav-freshclam Service (Ubuntu)
+    service:
+      name: "clamav-freshclam"
+      state: stopped
+    when: ansible_facts['os_family'] == "Debian"
+
+  - name: Configure LogSyslog & DatabaseMirror in freshclam.conf (Ubuntu)
+    lineinfile:
+      path: /etc/clamav/freshclam.conf
+      regexp: '{{ item.regexp }}'
+      line: '{{ item.line }}'
+    loop:
+      - line: 'LogSyslog true'
+        regexp: '^LogSyslog'
+      - line: 'DatabaseMirror "{{ clamav_repo }}"'
+        regexp: '^DatabaseMirror db.local.clamav.net'
+    when: ansible_facts['os_family'] == "Debian"
+
+  - name: Configure PidFile, DatabaseOwner, NotifyClamd & DatabaseMirror in freshclam.conf (RHEL, Alma)
+    lineinfile:
+      path: /etc/freshclam.conf
+      regexp: '{{ item.regexp }}'
+      line: '{{ item.line }}'
+    loop:
+      - line: 'PidFile /var/run/freshclam.pid'
+        regexp: '^#PidFile'
+      - line: 'DatabaseOwner clamupdate'
+        regexp: '^#DatabaseOwner'
+      - line: 'DatabaseMirror "{{ clamav_repo }}"'
+        regexp: '^#DatabaseMirror'
+      - line: 'NotifyClamd /etc/clamd.d/scan.conf'
+        regexp: '^#NotifyClamd'
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "AlmaLinux"
+
+  - name: Configure a Proxy if Needed (Ubuntu)
+    lineinfile:
+      path: /etc/clamav/freshclam.conf
+      insertafter: EOF
+      line: '{{ item.line }}'
+    loop:
+      - line: 'HTTPProxyServer http://{{ tunnel_ip }}'
+      - line: 'HTTPProxyPort {{ proxy_port }}'
+    when:
+      - proxy | bool
+      - ansible_facts['os_family'] == "Debian"
+
+  - name: Configure a Proxy if Needed (RHEL, Alma)
+    lineinfile:
+      path: /etc/freshclam.conf
+      insertafter: EOF
+      line: '{{ item.line }}'
+    loop:
+      - line: 'HTTPProxyServer http://{{ tunnel_ip }}'
+      - line: 'HTTPProxyPort {{ proxy_port }}'
+    when:
+      - proxy | bool
+      - ansible_facts['os_family'] == "RedHat" or ansible_facts['os_family'] == "AlmaLinux"
+
+  - name: Start and Enable the clamav-freshclam & clamav-daemon Services (Ubuntu)
+    service:
+      name: '{{ item }}'
+      enabled: yes
+      state: restarted
+    with_items:
+      - clamav-freshclam
+      - clamav-daemon
+    when: ansible_facts['os_family'] == "Debian"
+
+  - name: Intial Virus DB Download (RHEL, Alma)
+    shell: freshclam
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "AlmaLinux"
+
+  - name: Start and Enable the clamd@scan & clamav-freshclam Services (RHEL, Alma)
+    service:
+      name: '{{ item }}'
+      enabled: yes
+      state: restarted
+    with_items:
+      - clamd@scan
+      - clamav-freshclam
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "AlmaLinux"
+
+  - name: Copy clamdscan cron job into place (RHEL, Alma)
+    copy:
+      src: clamdscan.sh.j2
+      dest: /etc/cron.hourly/clamdscan
+      owner: root
+      group: root
+      mode: '0700'
+    when: ansible_facts['os_family'] == "RedHat" or
+          ansible_facts['os_family'] == "AlmaLinux"
+
+  - name: Scan /home to Confirm Functionality
+    shell: clamscan -r /home
+    register: clamscan_home
+    ignore_errors: yes
+  - debug: var=clamscan_home.stdout_lines

@@ -1,0 +1,42 @@
+#!/bin/bash
+name={{ inventory_hostname | lower }}
+audit_file=/tmp/$name
+touch $audit_file
+
+echo "Enrollment Audit Info for {{ inventory_hostname | upper }}" > $audit_file
+
+printf "\n------------------ HOSTNAME ------------------\n\n" >> $audit_file
+hostname >> $audit_file 2>&1
+
+printf "\n------------------ DATE ------------------\n\n" >> $audit_file
+date >> $audit_file 2>&1
+
+printf "\n------------------ IP ADDRESS ------------------\n\n" >> $audit_file
+ip addr >> $audit_file 2>&1
+
+printf "\n------------------ OS RELEASE ------------------\n\n" >> $audit_file
+cat /etc/*-release* >> $audit_file 2>&1
+
+printf "\n------------------ FILESYSTEMS ------------------\n\n" >> $audit_file
+df -h >> $audit_file 2>&1
+
+printf "\n------------------ CPU & MEMORY INFO ------------------\n\n" >> $audit_file
+vmstat >> $audit_file 2>&1
+
+printf "\n------------------ PYTHON VERSION ------------------\n\n" >> $audit_file
+python -V >> $audit_file 2>&1
+printf "\n---\n\n"
+dpkg -l | grep -i python >> $audit_file 2>&1
+
+printf "\n------------------ FIREWALL STATUS ------------------\n\n" >> $audit_file
+systemctl status ufw >> $audit_file 2>&1
+
+printf "\n------------------ FIREWALL RULES ------------------\n\n" >> $audit_file
+ufw status numbered >> $audit_file 2>&1
+
+printf "\n------------------- AVAILABLE PATCHES -----------------\n\n" >> $audit_file
+apt update >> $audit_file 2>&1
+printf "\n\n" >> $audit_file
+apt list --upgradable >> $audit_file 2>&1
+
+exit
