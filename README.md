@@ -1,7 +1,8 @@
 # Linux Enrollment Samples
 
-## "access.yml" Ansible Playbook:
-Playbook used to create access scripts for each device in the inventory.
+## "access.yml" Ansible Playbook
+
+Used to create access scripts for each device in the inventory.
 
 ### Requires:
 
@@ -13,9 +14,10 @@ Playbook used to create access scripts for each device in the inventory.
 
 ```ansible-playbook access.yml -i inventory --ask-vault-pass```
 
-## "audit.yml" Ansible Playbook:
-Playbook used to audit devices in inventory prior to enrollment.
-Shell scripts are pushed to the devices to create a report.
+## "audit.yml" Ansible Playbook
+
+Complets an audit of devices in inventory prior to enrollment.<br/>
+Shell scripts are pushed to the devices to create a report.<br/>
 The report is pulled back to the bastion and remote files cleaned up.
 
 ### Requires:
@@ -31,9 +33,10 @@ The report is pulled back to the bastion and remote files cleaned up.
 
 ```ansible-playbook audit.yml -i inventory --ask-vault-pass```
 
-## "enrollment.yml" Ansible Playbook:
-Playbook used to satisfy enrollment prerequisites for monitoring and support for Linux servers.
-Required packages are installed. Configuration files are created or updated as needed.
+## "enrollment.yml" Ansible Playbook
+
+Satisfies enrollment prerequisites for monitoring and support for Linux servers.<br/>
+Required packages are installed. Configuration files are created or updated as needed.<br/>
 Accounts and an access group is configured.
 
 ### Requires:
@@ -47,10 +50,11 @@ Accounts and an access group is configured.
 
 ```ansible-playbook enrollment.yml -i inventory --ask-vault-pass```
 
-## "qa.yml" Ansible Playbook:
-Playbook used to qa devices in inventory after enrollment.
-Shell scripts are pushed to the devices to create a report.
-The report is pulled back to the bastion and remote files cleaned up.
+## "qa.yml" Ansible Playbook
+
+Completes QA tests against devices in inventory after enrollment.<br/>
+Shell scripts are pushed to the devices to create a report.<br/>
+The report is pulled back to the bastion and remote files cleaned up.<br/>
 Local bastion qa output is then appended to the existing report.
 
 ### Requires:
@@ -65,11 +69,12 @@ Local bastion qa output is then appended to the existing report.
 
 ```ansible-playbook qa.yml -i inventory --ask-vault-pass```
 
-## "syslog_search.sh" Bash Script:
-Script was created to confirm log remote logging was configured correctly. 
-The devices in the inventory file are searched for in the 'syslog' log file and archive directories.
-Archive files required the use of 'bzcat' to unzip while searching.
-The first 3 log files per device name are saved to a report. 
+## "syslog_search.sh" Bash Script
+
+Created to confirm remote logging was configured correctly and is functioning.<br/>
+The devices in the inventory file are searched in the 'syslog' file and archive directories.<br/>
+Archive files required the use of 'bzcat' to unzip while searching.<br/>
+The first 3 log files per device name are saved to a report.<br/>
 Once logs are found, the script moves on to the next device in the inventory list.
 
 ### Requires:
@@ -82,8 +87,10 @@ Once logs are found, the script moves on to the next device in the inventory lis
 
  ```./syslog-search.sh # Optional[-h]```
 
-## "add_fw_rule.yml" Ansible Playbook:
-Simple playbook to add a firewall rule for SNMP traffic when needed.
+## "add_fw_rule.yml" Ansible Playbook
+
+Adds a firewall rule for SNMP traffic as needed.<br/>
+Utilizes UWF for ubuntu and creates a rich rule for RedHat based servers.
 
 ### Requires:
 
@@ -94,9 +101,10 @@ Simple playbook to add a firewall rule for SNMP traffic when needed.
 
 ```ansible-playbook add_fw_rule.yml -i inventory --ask-vault-pass```
 
-## "setup_accounts.yml" Ansible Playbook:
-Playbook written to accomplish user account tasks prior to enrollment. 
-A new account is created for management and added to the access group. 
+## "setup_accounts.yml" Ansible Playbook
+
+Written to accomplish user account creation and modification tasks prior to enrollment.<br/>
+A new account is created for management and added to the access group.<br/>
 The existing ansible_user account is added to the access group and password reset. 
 
 ### Requires:
@@ -109,9 +117,10 @@ The existing ansible_user account is added to the access group and password rese
 
 ```ansible-playbook setup_accounts.yml -i inventory --ask-vault-pass```
 
-## "clamav.yml" Ansible Playbook:
-Playbook written to install Clam antivirus. 
-All needed configuration is completed including setting an optional proxy.
+## "clamav.yml" Ansible Playbook
+
+Installs Clam antivirus and completes all needed configuration.<br/>
+The playbook tests if a proxy is needed and makes the configuration changes if so.<br/>
 A scan of '/home' directories is completed to confirm functionality.
 
 ### Requires:
@@ -124,10 +133,9 @@ A scan of '/home' directories is completed to confirm functionality.
 
 ```ansible-playbook clamav.yml -i inventory --ask-vault-pass```
 
-## "qualys.yml" Ansible Playbook:
-Playbook written to install the Qualys Cloud Agent.
-Installer files are copied to remote devices and installed. 
-Devices are registered and activated.
+## "qualys.yml" Ansible Playbook
+
+Installs the Qualys Cloud Agent then registers and activates the devices.
 
 ### Requires:
 
