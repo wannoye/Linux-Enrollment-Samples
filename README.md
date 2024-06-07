@@ -74,8 +74,7 @@ Local bastion qa output is then appended to the existing report.
 Created to confirm remote logging was configured correctly and is functioning.<br/>
 The devices in the inventory file are searched in the 'syslog' file and archive directories.<br/>
 Archive files required the use of 'bzcat' to unzip while searching.<br/>
-The first 3 log files per device name are saved to a report.<br/>
-Once logs are found, the script moves on to the next device in the inventory list.
+The first 3 log files per device name are saved to a report.
 
 ### Requires:
 
@@ -110,8 +109,9 @@ The existing ansible_user account is added to the access group and password rese
 ### Requires:
 
  - An 'inventory' file in the same directory as the playbook
- - The 'group_vars/all.yml' file filled out and encrypted with ansible-vault
- - Hashed passwords can be created with the command 'mkpasswd -m sha512crypt'
+ - The 'group_vars/all.yml' file filled out and encrypted with ansible-vault<br/>
+ 
+ Note: Hashed passwords can be created with the command 'mkpasswd -m sha512crypt'
 
 ### Usage:
 
